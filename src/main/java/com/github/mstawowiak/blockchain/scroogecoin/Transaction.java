@@ -82,7 +82,7 @@ public class Transaction {
     public void removeInput(UTXO ut) {
         for (int i = 0; i < inputs.size(); i++) {
             Input in = inputs.get(i);
-            UTXO utxo = new UTXO(in.prevTxHash, in.outputIndex);
+            UTXO utxo = UTXO.of(in.prevTxHash, in.outputIndex);
             if (utxo.equals(ut)) {
                 inputs.remove(i);
                 return;

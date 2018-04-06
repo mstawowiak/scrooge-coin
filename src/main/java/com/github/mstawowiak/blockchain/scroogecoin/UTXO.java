@@ -2,7 +2,7 @@ package com.github.mstawowiak.blockchain.scroogecoin;
 
 import java.util.Arrays;
 
-public class UTXO implements Comparable<UTXO> {
+public final class UTXO implements Comparable<UTXO> {
 
     /** Hash of the transaction from which this UTXO originates */
     private final byte[] txHash;
@@ -14,9 +14,13 @@ public class UTXO implements Comparable<UTXO> {
      * Creates a new UTXO corresponding to the output with index <index> in the transaction whose
      * hash is {@code txHash}
      */
-    public UTXO(byte[] txHash, int index) {
+    private UTXO(byte[] txHash, int index) {
         this.txHash = Arrays.copyOf(txHash, txHash.length);
         this.index = index;
+    }
+
+    public static UTXO of(byte[] txHash, int index) {
+        return new UTXO(txHash, index);
     }
 
     /** @return the transaction hash of this UTXO */
