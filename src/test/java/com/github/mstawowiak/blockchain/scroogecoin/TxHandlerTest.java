@@ -44,11 +44,16 @@ public class TxHandlerTest {
     private static final UTXO UTXO_B1 = UTXO.of(TX_B_HASH, TX_B1_INDEX);
     private static final double UTXO_B1_VALUE = 100;
 
+    private static final double NEGATIVE_VALUE = -100.0;
+
     private static final KeyPair JOHN_KEY_PAIR = RSA.generateRSA2048();
     private static final PublicKey JOHN_PUBLIC_KEY = JOHN_KEY_PAIR.getPublic();
 
     private static final KeyPair MARK_KEY_PAIR = RSA.generateRSA2048();
     private static final PublicKey MARK_PUBLIC_KEY = MARK_KEY_PAIR.getPublic();
+
+    private static final KeyPair SAM_KEY_PAIR = RSA.generateRSA2048();
+    private static final PublicKey SAM_PUBLIC_KEY = SAM_KEY_PAIR.getPublic();
 
     @Before
     public void beforeTest() {
@@ -94,9 +99,9 @@ public class TxHandlerTest {
         List<UTXO> inputs = Collections.singletonList(UTXO_B0);
 
         List<Pair<Double, PublicKey>> outputs = new ArrayList<>();
-        outputs.add(Pair.of(new Double(80), MARK_PUBLIC_KEY));
-        outputs.add(Pair.of(new Double(50), MARK_PUBLIC_KEY));
-        outputs.add(Pair.of(new Double(70), MARK_PUBLIC_KEY));
+        outputs.add(Pair.of(80.0, MARK_PUBLIC_KEY));
+        outputs.add(Pair.of(50.0, MARK_PUBLIC_KEY));
+        outputs.add(Pair.of(70.0, MARK_PUBLIC_KEY));
 
         transactions.add(makeTxn(JOHN_KEY_PAIR.getPrivate(), inputs, outputs));
 
@@ -121,6 +126,83 @@ public class TxHandlerTest {
         List<Transaction> result = txHandler.handleTxs(transactions);
 
         assertEquals(1, result.size());
+    }
+
+    @Test
+    public void shouldHandleFewTransaction() {
+        transactions.add(
+                makeTxn(JOHN_KEY_PAIR.getPrivate(),
+                        Collections.singletonList(UTXO_A0),
+                        Collections.singletonList(Pair.of(UTXO_A0_VALUE, MARK_PUBLIC_KEY))));
+        transactions.add(
+                makeTxn(JOHN_KEY_PAIR.getPrivate(),
+                        Collections.singletonList(UTXO_A1),
+                        Collections.singletonList(Pair.of(UTXO_A1_VALUE, MARK_PUBLIC_KEY))));
+        transactions.add(
+                makeTxn(JOHN_KEY_PAIR.getPrivate(),
+                        Collections.singletonList(UTXO_B0),
+                        Collections.singletonList(Pair.of(UTXO_B0_VALUE, MARK_PUBLIC_KEY))));
+        transactions.add(
+                makeTxn(JOHN_KEY_PAIR.getPrivate(),
+                        Collections.singletonList(UTXO_B1),
+                        Collections.singletonList(Pair.of(UTXO_B1_VALUE, MARK_PUBLIC_KEY))));
+
+        //when
+        List<Transaction> result = txHandler.handleTxs(transactions);
+
+        assertEquals(4, result.size());
+    }
+
+    @Test
+    public void shouldRejectInvalidTransaction() {
+        transactions.add(
+                makeTxn(JOHN_KEY_PAIR.getPrivate(),
+                        Collections.singletonList(UTXO_A0),
+                        Collections.singletonList(Pair.of(UTXO_A0_VALUE, MARK_PUBLIC_KEY))));
+
+        //next 3 transactions are invalid:
+        //double spend
+        transactions.add(
+                makeTxn(JOHN_KEY_PAIR.getPrivate(),
+                        Collections.singletonList(UTXO_A0),
+                        Collections.singletonList(Pair.of(UTXO_A0_VALUE, MARK_PUBLIC_KEY))));
+        //negative output
+        transactions.add(
+                makeTxn(JOHN_KEY_PAIR.getPrivate(),
+                        Collections.singletonList(UTXO_A1),
+                        Collections.singletonList(Pair.of(NEGATIVE_VALUE, MARK_PUBLIC_KEY))));
+        //outputs > inputs
+        transactions.add(
+                makeTxn(JOHN_KEY_PAIR.getPrivate(),
+                        Collections.singletonList(UTXO_B0),
+                        Collections.singletonList(Pair.of(UTXO_B0_VALUE + 1, MARK_PUBLIC_KEY))));
+
+        //when
+        List<Transaction> result = txHandler.handleTxs(transactions);
+
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    public void shouldHandleTwoBlocksInRow() {
+        Transaction transactionJohnToMark = makeTxn(JOHN_KEY_PAIR.getPrivate(),
+                Collections.singletonList(UTXO_A0),
+                Collections.singletonList(Pair.of(UTXO_A0_VALUE, MARK_PUBLIC_KEY)));
+
+        //when
+        List<Transaction> result1 = txHandler.handleTxs(Collections.singletonList(transactionJohnToMark));
+
+        assertEquals(1, result1.size());
+
+        //Create next transaction based on 'transactionJohnToMark'
+        Transaction transactionMarkToSam = makeTxn(MARK_KEY_PAIR.getPrivate(),
+                Collections.singletonList(UTXO.of(transactionJohnToMark.getHash(), 0)),
+                Collections.singletonList(Pair.of(UTXO_A0_VALUE, SAM_PUBLIC_KEY)));
+
+        //when
+        List<Transaction> result2 = txHandler.handleTxs(Collections.singletonList(transactionMarkToSam));
+
+        assertEquals(1, result2.size());
     }
 
     private Transaction makeTxn(PrivateKey privateKey, List<UTXO> utxos, List<Pair<Double, PublicKey>> outputs) {
